@@ -1,20 +1,21 @@
 import express from "express";
 import fetch from "node-fetch";
+import { GoogleAuth } from "google-auth-library";
 
 const app = express();
 app.use(express.json({ limit: "20mb" }));
 
-app.post("/", async (req, res) => {
+///predict を定義
+app.post("/predict", async (req, res) => {
   try {
     const { imageBase64, garmentBase64 } = req.body;
     if (!imageBase64 || !garmentBase64) {
       return res.status(400).json({ error: "Missing imageBase64 or garmentBase64" });
     }
 
-    const PROJECT_ID = "kisekaeai";
+    const PROJECT_ID = "kisekaeai"; // ← あなたのプロジェクトIDに置き換え
     const ENDPOINT = `https://asia-northeast1-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/asia-northeast1/publishers/google/models/virtual-try-on:predict`;
 
-    const { GoogleAuth } = await import("google-auth-library");
     const auth = new GoogleAuth({
       scopes: ["https://www.googleapis.com/auth/cloud-platform"]
     });
@@ -45,6 +46,7 @@ app.post("/", async (req, res) => {
   }
 });
 
+// 確認用ルート（ブラウザアクセス用）
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "Vertex Proxy is running" });
 });
