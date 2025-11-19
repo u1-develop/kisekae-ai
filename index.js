@@ -21,21 +21,25 @@ async function getToken() {
 
 app.post("/edit", async (req, res) => {
   try {
-    const { baseImage, editImage } = req.body || {};
-
+    const { baseImage, editImage, prompt } = req.body || {};
     if (!baseImage || !editImage) {
       return res.status(400).json({ error: "Missing baseImage or editImage" });
     }
+
+    const ENDPOINT =
+      `${BASE_URL}/imagegeneration@002:predict`;
 
     const accessToken = await getToken();
 
     const body = {
       instances: [
         {
-          personImage: { imageBytes: baseImage },
-          garmentImage: { imageBytes: editImage },
-        },
+          prompt: prompt || "Apply the garment image naturally onto the person image.",
+          personImage: { bytesBase64Encoded: baseImage },
+          garmentImage: { bytesBase64Encoded: editImage }
+        }
       ],
+      parameters: { sampleCount: 1 }
     };
 
     const response = await fetch(ENDPOINT, {
@@ -50,9 +54,11 @@ app.post("/edit", async (req, res) => {
     const data = await response.json();
     res.status(response.status).json(data);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: String(err.message || err) });
   }
 });
+
 
 app.get("/", (_req, res) => res.json({ status: "ok" }));
 
