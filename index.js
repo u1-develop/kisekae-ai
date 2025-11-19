@@ -1,61 +1,49 @@
-// index.js — Cloud Run proxy for OpenAI Try-On API
 import express from "express";
 import fetch from "node-fetch";
+import { GoogleAuth } from "google-auth-library";
 
 const app = express();
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: "20mb" }));
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-// Try-On API 正式エンドポイント
-const OPENAI_TRYON_URL = "https://api.openai.com/v1/vision/try-on";
-
-app.post("/tryon", async (req, res) => {
+// Imagen (imagegeneration@005) でテキストから画像を生成
+app.post("/predict", async (req, res) => {
   try {
-    const { personImage, garmentImage, prompt } = req.body || {};
-
-    if (!personImage || !garmentImage) {
-      return res.status(400).json({ error: "Missing images." });
+    const { prompt } = req.body || {};
+    if (!prompt) {
+      return res.status(400).json({ error: "Missing prompt text" });
     }
+
+    const PROJECT_ID = "kisekaeai";
+    const LOCATION = "us-central1";
+    const ENDPOINT = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/imagegeneration@005:predict`;
+
+    const auth = new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/cloud-platform"] });
+    const client = await auth.getClient();
+    const accessToken = await client.getAccessToken();
 
     const body = {
-      model: "gpt-image-1",
-      task: "fashion-tryon",
-      prompt: prompt || "Natural fashion try-on result.",
-      subject_image: { image: personImage },
-      clothing_image: { image: garmentImage }
+      instances: [{ prompt }],
+      parameters: { sampleCount: 1, aspectRatio: "1:1" },
     };
 
-    const response = await fetch(OPENAI_TRYON_URL, {
+    const response = await fetch(ENDPOINT, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
+        Authorization: `Bearer ${accessToken.token || accessToken}`,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
 
-    const text = await response.text();
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      return res.status(500).json({
-        error: "OpenAI returned non-JSON (HTML) response",
-        raw: text
-      });
-    }
-
+    const data = await response.json();
     res.status(response.status).json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: String(err.message || err) });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// health check
 app.get("/", (_req, res) => res.json({ status: "ok" }));
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`Cloud Run proxy running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
