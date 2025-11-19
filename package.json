@@ -1,8 +1,7 @@
 {
-  "name": "vertex-proxy",
+  "name": "tryon-gateway",
   "version": "1.0.0",
   "type": "module",
-  "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
