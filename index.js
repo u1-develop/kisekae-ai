@@ -7,6 +7,7 @@ app.use(express.json({ limit: "50mb" }));
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// ========= Try-On API（人物 × 服） =========
 app.post("/tryon", async (req, res) => {
   try {
     const { personImage, garmentImage } = req.body || {};
@@ -15,13 +16,14 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing images." });
     }
 
-    // OpenAI Try-On API エンドポイント
+    // Try-On API の正式エンドポイント
     const url = "https://api.openai.com/v1/vision/tryon";
 
+    // Try-On API の正式 body
     const body = {
       model: "gpt-image-1",
-      subject: personImage,      // ← 修正
-      cloth: garmentImage        // ← 修正
+      subject: personImage,   // ← BASE64 のみ
+      cloth: garmentImage     // ← BASE64 のみ
     };
 
     const response = await fetch(url, {
