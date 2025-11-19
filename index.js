@@ -5,7 +5,6 @@ import { GoogleAuth } from "google-auth-library";
 const app = express();
 app.use(express.json({ limit: "20mb" }));
 
-// Imagen (imagegeneration@005) でテキストから画像を生成
 app.post("/predict", async (req, res) => {
   try {
     const { prompt } = req.body || {};
@@ -14,8 +13,11 @@ app.post("/predict", async (req, res) => {
     }
 
     const PROJECT_ID = "kisekaeai";
-    const LOCATION = "us-central1";
-    const ENDPOINT = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/imagegeneration@005:predict`;
+    const LOCATION = "us-east4";  // ← ここを絶対変更！
+    const MODEL = "imagegeneration@005";
+
+    const ENDPOINT =
+      `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL}:predict`;
 
     const auth = new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/cloud-platform"] });
     const client = await auth.getClient();
@@ -37,6 +39,7 @@ app.post("/predict", async (req, res) => {
 
     const data = await response.json();
     res.status(response.status).json(data);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
