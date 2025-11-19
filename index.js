@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json({ limit: "30mb" }));
 
 const PROJECT_ID = "kisekaeai";
-const LOCATION = "us-central1";
+const LOCATION = "asia-northeast1";
 const MODEL = "virtual-try-on";
 const ENDPOINT = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL}:predict`;
 
