@@ -5,30 +5,26 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json({ limit: "50mb" }));
 
-// OpenAI API Key
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// Try-On モデル名（固定）
-const OPENAI_TRYON_MODEL = "gpt-image-1";
-
-// ========= Try-On API（人物 × 服） =========
 app.post("/tryon", async (req, res) => {
   try {
-    const { personImage, garmentImage, prompt } = req.body || {};
+    const { personImage, garmentImage } = req.body || {};
 
     if (!personImage || !garmentImage) {
       return res.status(400).json({ error: "Missing images." });
     }
 
+    // OpenAI Try-On API エンドポイント
+    const url = "https://api.openai.com/v1/vision/tryon";
+
     const body = {
-      model: OPENAI_TRYON_MODEL,
-      task: "fashion-tryon",
-      subject_image: { image: personImage },
-      clothing_image: { image: garmentImage },
-      prompt: prompt || "A natural fashion try-on result."
+      model: "gpt-image-1",
+      subject: personImage,      // ← 修正
+      cloth: garmentImage        // ← 修正
     };
 
-    const response = await fetch("https://api.openai.com/v1/images/edits", {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
@@ -46,7 +42,6 @@ app.post("/tryon", async (req, res) => {
   }
 });
 
-// health check
 app.get("/", (_req, res) => res.json({ status: "ok" }));
 
 const PORT = process.env.PORT || 8080;
