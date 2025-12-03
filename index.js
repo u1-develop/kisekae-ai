@@ -12,7 +12,7 @@ const LOCATION = "asia-northeast1";
 // VTOモデルID
 const MODEL_ID = "virtual-try-on-preview-08-04";
 
-// 💥 修正済み: PROJECTS_ID ではなく PROJECT_ID を使用
+// エンドポイント: PROJECT_IDのタイプミスは修正済み
 const ENDPOINT =
   `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
 
@@ -34,16 +34,21 @@ app.post("/tryon", async (req, res) => {
     if (!personImage || !garmentImage) {
       return res.status(400).json({ error: "Missing personImage or garmentImage" });
     }
-
+    
+    // 💥 修正: Base64にMIMEタイププレフィックスを付与
+    // VTOモデルが厳密に "data:image/png;base64,..." 形式を要求する可能性に対応
+    const personImageWithPrefix = `data:image/png;base64,${personImage}`;
+    const garmentImageWithPrefix = `data:image/png;base64,${garmentImage}`;
+    
     // --- Vertex AI VTO モデルの厳密なペイロード形式 ---
     const body = {
       instances: [
         {
           person_image_bytes: {
-              bytesBase64Encoded: personImage
+              bytesBase64Encoded: personImageWithPrefix
           },
           garment_image_bytes: {
-              bytesBase64Encoded: garmentImage
+              bytesBase64Encoded: garmentImageWithPrefix
           },
         }
       ],
