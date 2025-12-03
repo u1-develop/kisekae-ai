@@ -1,4 +1,4 @@
-// index.js — Google Try-On Gateway
+// index.js — Google Try-On Gateway (Vertex AI VTO 対応版)
 import express from "express";
 import fetch from "node-fetch";
 import { GoogleAuth } from "google-auth-library";
@@ -6,9 +6,11 @@ import { GoogleAuth } from "google-auth-library";
 const app = express();
 app.use(express.json({ limit: "40mb" }));
 
+// --- 設定値の修正 ---
 const PROJECT_ID = "kisekaeai";
 const LOCATION = "asia-northeast1";
-const MODEL_ID = "publishers/google/models/virtual-try-on-preview-08-04";
+// 1. MODEL_ID から冗長なパスを削除し、IDのみにする
+const MODEL_ID = "virtual-try-on-preview-08-04";
 
 const ENDPOINT =
   `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
@@ -19,6 +21,7 @@ async function getToken() {
     scopes: ["https://www.googleapis.com/auth/cloud-platform"],
   });
   const client = await auth.getClient();
+  // VTOモデルは処理時間が長いため、クライアント認証の期限を長めに考慮することが望ましいが、ここでは標準実装を維持
   const token = await client.getAccessToken();
   return token.token || token;
 }
@@ -32,15 +35,22 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing personImage or garmentImage" });
     }
 
+    // 2. VTO モデルの API 仕様に合わせて body を修正
     const body = {
       instances: [
         {
-          prompt: "Place the garment image naturally on the person.",
-          image: { imageBytes: personImage },
-          edit: { imageBytes: garmentImage }
+          // 人物画像を Base64 で送信
+          b64_person_image: personImage,
+          // 服の画像を Base64 で送信
+          b64_product_image: garmentImage,
+          // VTOモデルは通常、自動で試着を行うためプロンプトは不要
         }
       ],
-      parameters: { sampleCount: 1 }
+      // 3. VTO モデルのパラメータを調整 (品質/速度トレードオフ)
+      parameters: { 
+          image_count: 1,
+          base_steps: 32 
+      }
     };
 
     const accessToken = await getToken();
@@ -52,6 +62,7 @@ app.post("/tryon", async (req, res) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      // VTOは処理時間が長いため、fetchのタイムアウト設定を検討する
     });
 
     const data = await response.json();
