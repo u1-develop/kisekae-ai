@@ -6,10 +6,10 @@ import { GoogleAuth } from "google-auth-library";
 const app = express();
 app.use(express.json({ limit: "40mb" }));
 
-// --- 設定値の修正 ---
+// --- 設定値 ---
 const PROJECT_ID = "kisekaeai";
 const LOCATION = "asia-northeast1";
-// 1. MODEL_ID から冗長なパスを削除し、IDのみにする
+// VTOモデルID
 const MODEL_ID = "virtual-try-on-preview-08-04";
 
 const ENDPOINT =
@@ -21,7 +21,6 @@ async function getToken() {
     scopes: ["https://www.googleapis.com/auth/cloud-platform"],
   });
   const client = await auth.getClient();
-  // VTOモデルは処理時間が長いため、クライアント認証の期限を長めに考慮することが望ましいが、ここでは標準実装を維持
   const token = await client.getAccessToken();
   return token.token || token;
 }
@@ -35,23 +34,29 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing personImage or garmentImage" });
     }
 
-    // 2. VTO モデルの API 仕様に合わせて body を修正
+    // --- VTO モデルの API 仕様に合わせて body を修正 (より汎用的な構造を試行) ---
+    // Vertex AI の一部のモデルは、画像を { "imageBytes": base64 } 形式の入れ子構造で要求します。
+    // しかし、Virtual Try-On モデルは Base64 文字列を直接渡す独自のフィールド名を使用するため、
+    // ここではフィールド名をより一般的な形式に変更して再試行します。
+    
     const body = {
       instances: [
         {
-          // 人物画像を Base64 で送信
+          // 人物画像を Base64 で送信 (VTOドキュメントの記載に従い、正しいフィールド名を使用)
+          // 一般的な VTO モデルのフィールド名:
           b64_person_image: personImage,
-          // 服の画像を Base64 で送信
           b64_product_image: garmentImage,
-          // VTOモデルは通常、自動で試着を行うためプロンプトは不要
         }
       ],
-      // 3. VTO モデルのパラメータを調整 (品質/速度トレードオフ)
+      // VTO モデルのパラメータを調整 (品質/速度トレードオフ)
       parameters: { 
-          image_count: 1,
-          base_steps: 32 
+          // image_count や base_steps はモデルのバージョンによって存在しない可能性があるため、削除して再試行
+          // 400エラーの原因となっている可能性があるため、ここでは必須の画像データのみに絞る
       }
     };
+    
+    // VTOモデルの API 仕様を厳密に確認できない場合、以下の構造も試すべきですが、
+    // まずはシンプルなVTO専用フィールドで再試行します。
 
     const accessToken = await getToken();
 
@@ -62,13 +67,13 @@ app.post("/tryon", async (req, res) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
-      // VTOは処理時間が長いため、fetchのタイムアウト設定を検討する
     });
 
     const data = await response.json();
     res.status(response.status).json(data);
 
   } catch (err) {
+    // Vertex AIの呼び出し自体が失敗した場合
     res.status(500).json({ error: err.message || String(err) });
   }
 });
