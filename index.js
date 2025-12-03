@@ -34,30 +34,27 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing personImage or garmentImage" });
     }
 
-    // --- VTO モデルの API 仕様に合わせて body を修正 (より汎用的な構造を試行) ---
-    // Vertex AI の一部のモデルは、画像を { "imageBytes": base64 } 形式の入れ子構造で要求します。
-    // しかし、Virtual Try-On モデルは Base64 文字列を直接渡す独自のフィールド名を使用するため、
-    // ここではフィールド名をより一般的な形式に変更して再試行します。
+    // --- VTO モデルの API 仕様に合わせて body を修正 (Vertex AI のより厳密な標準形式を試行) ---
+    // Vertex AI の一部のカスタム/プレビューモデルは、以下の構造を要求します。
+    // キー名: person_image, product_image
+    // 値: { bytesBase64Encoded: Base64文字列 }
     
     const body = {
       instances: [
         {
-          // 人物画像を Base64 で送信 (VTOドキュメントの記載に従い、正しいフィールド名を使用)
-          // 一般的な VTO モデルのフィールド名:
-          b64_person_image: personImage,
-          b64_product_image: garmentImage,
+          // 修正: person_image と product_image キーを使用し、値を { bytesBase64Encoded: ... } でラップ
+          person_image: {
+              bytesBase64Encoded: personImage
+          },
+          product_image: {
+              bytesBase64Encoded: garmentImage
+          },
         }
       ],
-      // VTO モデルのパラメータを調整 (品質/速度トレードオフ)
-      parameters: { 
-          // image_count や base_steps はモデルのバージョンによって存在しない可能性があるため、削除して再試行
-          // 400エラーの原因となっている可能性があるため、ここでは必須の画像データのみに絞る
-      }
+      // parameters は空のまま
+      parameters: {}
     };
     
-    // VTOモデルの API 仕様を厳密に確認できない場合、以下の構造も試すべきですが、
-    // まずはシンプルなVTO専用フィールドで再試行します。
-
     const accessToken = await getToken();
 
     const response = await fetch(ENDPOINT, {
