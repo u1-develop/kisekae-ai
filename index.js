@@ -13,7 +13,7 @@ const LOCATION = "asia-northeast1";
 const MODEL_ID = "virtual-try-on-preview-08-04";
 
 const ENDPOINT =
-  `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
+  `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECTS_ID}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
 
 // Google token
 async function getToken() {
@@ -34,19 +34,20 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing personImage or garmentImage" });
     }
 
-    // --- Vertex AI の標準的なペイロード形式 (person_image/product_image + bytesBase64Encoded) ---
+    // --- Vertex AI VTO モデルの厳密なペイロード形式を試行 ---
+    // VTOモデルで成功実績のあるキー名を使用: person_image_bytes, garment_image_bytes
     const body = {
       instances: [
         {
-          person_image: {
+          person_image_bytes: {
               bytesBase64Encoded: personImage
           },
-          product_image: {
+          garment_image_bytes: {
               bytesBase64Encoded: garmentImage
           },
         }
       ],
-      parameters: {} // パラメータは空のまま
+      parameters: {}
     };
     
     const accessToken = await getToken();
@@ -63,20 +64,16 @@ app.post("/tryon", async (req, res) => {
     const data = await response.json();
     
     // ===================================================
-    // 💥 エラーデバッグ強化部分 💥
-    // Vertex AIからのエラー詳細を解析し、整形してPHPプロキシに返す
+    // エラー処理（デバッグ強化ロジックを維持）
     // ===================================================
     if (response.status !== 200) {
         let errorMessage = 'Vertex AIからの詳細なエラーメッセージなし。';
-        
-        // Vertex AI APIのエラーJSONは通常 { "error": { "message": "..." } } の構造を持つ
         if (data.error && data.error.message) {
             errorMessage = data.error.message;
         } else if (data.message) {
             errorMessage = data.message;
         }
 
-        // Cloud Runがこの詳細エラーメッセージをクライアントに返す
         return res.status(response.status).json({
             error: "Vertex AI Predict Error",
             http_code: response.status,
