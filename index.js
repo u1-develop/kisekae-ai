@@ -1,8 +1,9 @@
+console.log("VTO Gateway Build: 2025-12-03_01");
+
 import express from "express";
 import fetch from "node-fetch";
 import { GoogleAuth } from "google-auth-library";
 
-console.log("VTO Gateway Build: 2025-12-03_01");
 
 const app = express();
 app.use(express.json({ limit: "40mb" }));
