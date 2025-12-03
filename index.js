@@ -34,15 +34,10 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing personImage or garmentImage" });
     }
 
-    // --- VTO モデルの API 仕様に合わせて body を修正 (Vertex AI のより厳密な標準形式を試行) ---
-    // Vertex AI の一部のカスタム/プレビューモデルは、以下の構造を要求します。
-    // キー名: person_image, product_image
-    // 値: { bytesBase64Encoded: Base64文字列 }
-    
+    // --- Vertex AI の標準的なペイロード形式 (person_image/product_image + bytesBase64Encoded) ---
     const body = {
       instances: [
         {
-          // 修正: person_image と product_image キーを使用し、値を { bytesBase64Encoded: ... } でラップ
           person_image: {
               bytesBase64Encoded: personImage
           },
@@ -51,8 +46,7 @@ app.post("/tryon", async (req, res) => {
           },
         }
       ],
-      // parameters は空のまま
-      parameters: {}
+      parameters: {} // パラメータは空のまま
     };
     
     const accessToken = await getToken();
@@ -67,11 +61,37 @@ app.post("/tryon", async (req, res) => {
     });
 
     const data = await response.json();
-    res.status(response.status).json(data);
+    
+    // ===================================================
+    // 💥 エラーデバッグ強化部分 💥
+    // Vertex AIからのエラー詳細を解析し、整形してPHPプロキシに返す
+    // ===================================================
+    if (response.status !== 200) {
+        let errorMessage = 'Vertex AIからの詳細なエラーメッセージなし。';
+        
+        // Vertex AI APIのエラーJSONは通常 { "error": { "message": "..." } } の構造を持つ
+        if (data.error && data.error.message) {
+            errorMessage = data.error.message;
+        } else if (data.message) {
+            errorMessage = data.message;
+        }
+
+        // Cloud Runがこの詳細エラーメッセージをクライアントに返す
+        return res.status(response.status).json({
+            error: "Vertex AI Predict Error",
+            http_code: response.status,
+            detail: errorMessage,
+            raw_data: data
+        });
+    }
+    // ===================================================
+
+    // 成功時
+    res.status(200).json(data);
 
   } catch (err) {
-    // Vertex AIの呼び出し自体が失敗した場合
-    res.status(500).json({ error: err.message || String(err) });
+    // Node.js またはネットワークエラー
+    res.status(500).json({ error: "Cloud Run Internal Error", detail: err.message || String(err) });
   }
 });
 
