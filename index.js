@@ -8,7 +8,7 @@ app.use(express.json({ limit: "40mb" }));
 
 const PROJECT_ID = "kisekaeai";
 const LOCATION = "asia-northeast1";
-const MODEL_ID = "imageediting@001";
+const MODEL_ID = "publishers/google/models/virtual-try-on-preview-08-04";
 
 const ENDPOINT =
   `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
