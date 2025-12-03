@@ -8,15 +8,15 @@ app.use(express.json({ limit: "40mb" }));
 
 // --- 設定値 ---
 const PROJECT_ID = "kisekaeai";
-const LOCATION = "asia-northeast1";
+// 💥 修正: リージョンを US-CENTRAL1 に変更 (VTOモデルの制約を回避)
+const LOCATION = "us-central1"; 
 // VTOモデルID
 const MODEL_ID = "virtual-try-on-preview-08-04";
 
-// エンドポイント: PROJECT_IDのタイプミスは修正済み
 const ENDPOINT =
   `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
 
-// Google token
+// Google token取得
 async function getToken() {
   const auth = new GoogleAuth({
     scopes: ["https://www.googleapis.com/auth/cloud-platform"],
@@ -35,19 +35,18 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing personImage or garmentImage" });
     }
     
-    // 💥 修正: Base64にMIMEタイププレフィックスを付与
-    // VTOモデルが厳密に "data:image/png;base64,..." 形式を要求する可能性に対応
+    // Base64にMIMEタイププレフィックスを付与
     const personImageWithPrefix = `data:image/png;base64,${personImage}`;
     const garmentImageWithPrefix = `data:image/png;base64,${garmentImage}`;
     
-    // --- Vertex AI VTO モデルの厳密なペイロード形式 ---
+    // --- Vertex AI VTO モデルのペイロード形式 ---
     const body = {
       instances: [
         {
-          person_image_bytes: {
+          person_image_bytes: { 
               bytesBase64Encoded: personImageWithPrefix
           },
-          garment_image_bytes: {
+          garment_image_bytes: { 
               bytesBase64Encoded: garmentImageWithPrefix
           },
         }
@@ -68,9 +67,7 @@ app.post("/tryon", async (req, res) => {
 
     const data = await response.json();
     
-    // ===================================================
-    // エラー処理（デバッグ強化ロジックを維持）
-    // ===================================================
+    // エラー処理
     if (response.status !== 200) {
         let errorMessage = 'Vertex AIからの詳細なエラーメッセージなし。';
         if (data.error && data.error.message) {
@@ -80,24 +77,24 @@ app.post("/tryon", async (req, res) => {
         }
 
         return res.status(response.status).json({
-            error: "Vertex AI Predict Error",
+            status: "vertex_ai_error",
             http_code: response.status,
+            message: "Vertex AIがエラーコード " + response.status + " を返しました。",
             detail: errorMessage,
             raw_data: data
         });
     }
-    // ===================================================
 
     // 成功時
     res.status(200).json(data);
 
   } catch (err) {
     // Node.js またはネットワークエラー
-    res.status(500).json({ error: "Cloud Run Internal Error", detail: err.message || String(err) });
+    res.status(500).json({ status: "error", message: "Cloud Run内部で予期せぬエラーが発生しました", detail: err.message || String(err) });
   }
 });
 
 app.get("/", (_, res) => res.json({ status: "ok" }));
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log("Try-On Gateway (Tokyo) running"));
+app.listen(PORT, () => console.log("Try-On Gateway (US) running"));
