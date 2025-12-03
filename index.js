@@ -1,5 +1,5 @@
 // Debug build log
-console.log("VTO Gateway Build: 2025-12-03_01");
+console.log("VTO Gateway Build: 2025-12-03_02");
 
 import express from "express";
 import fetch from "node-fetch";
@@ -31,80 +31,56 @@ async function getToken() {
 // Virtual Try-On API
 app.post("/tryon", async (req, res) => {
   try {
-    // ★ リクエスト内容を Cloud Run にログ出力（超重要）
-    console.log("REQ_BODY:", JSON.stringify(req.body, null, 2));
+    // --- ここで Cloud Run に届いたボディを軽くログ出力 ---
+    const { personImage, garmentImage } = req.body || {};
 
-    const { personImage, garmentImage } = req.body;
+    console.log("REQ_LEN person / garment:", 
+      personImage ? personImage.length : 0,
+      garmentImage ? garmentImage.length : 0
+    );
 
     if (!personImage || !garmentImage) {
+      console.error("Missing image(s) in request body");
       return res.status(400).json({
         status: "error",
         message: "Missing personImage or garmentImage"
       });
     }
 
-    // ★ Google Virtual Try-On API 仕様に完全準拠した Body
+    // Virtual Try-On リクエストボディ
     const body = {
       instances: [
         {
           personImage: {
             image: {
-              bytesBase64Encoded: personImage   // Base64（プレフィックス無し）
+              // ★ data: や MIME プレフィックスは付けない生の Base64
+              bytesBase64Encoded: personImage
             }
           },
           productImages: [
             {
               image: {
-                bytesBase64Encoded: garmentImage // Base64（プレフィックス無し）
+                bytesBase64Encoded: garmentImage
               }
             }
           ]
         }
       ],
       parameters: {
-        sampleCount: 1
+        // 必須パラメータは一応入れておく
+        sampleCount: 1,
+        baseSteps: 32,
+        personGeneration: "allow_adult",
+        safetySetting: "block_medium_and_above",
+        outputOptions: {
+          mimeType: "image/png"
+        }
       }
     };
 
-    const accessToken = await getToken();
-
-    const response = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
+    console.log("SENDING_TO_VERTEX summary:", {
+      personLen: personImage.length,
+      garmentLen: garmentImage.length
     });
 
-    const data = await response.json();
-
-    // Vertex AI エラー
-    if (!response.ok) {
-      console.error("Vertex AI Error:", data);
-      return res.status(response.status).json({
-        status: "vertex_ai_error",
-        http_code: response.status,
-        message: data.error?.message || "Unknown Vertex AI error",
-        raw: data
-      });
-    }
-
-    // 正常時
-    return res.status(200).json(data);
-
-  } catch (err) {
-    console.error("Cloud Run internal error:", err);
-    return res.status(500).json({
-      status: "error",
-      message: "Cloud Run internal error",
-      detail: err.message || String(err)
-    });
-  }
-});
-
-// Health check
-app.get("/", (_, res) => res.json({ status: "ok" }));
-
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`Try-On Gateway running on ${PORT}`));
+    const accessToken =
