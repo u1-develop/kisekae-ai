@@ -1,4 +1,4 @@
-// Debug build log //
+// Debug build log
 console.log("VTO Gateway Build: 2025-12-03_02");
 
 import express from "express";
@@ -7,10 +7,9 @@ import { GoogleAuth } from "google-auth-library";
 
 const app = express();
 
-// JSON ボディを受け付ける
+// ===== 基本設定 =====
 app.use(express.json({ limit: "40mb" }));
 
-// Google Cloud 設定
 const PROJECT_ID = "kisekaeai";
 const LOCATION = "us-central1";
 const MODEL_ID = "virtual-try-on-preview-08-04";
@@ -18,42 +17,36 @@ const MODEL_ID = "virtual-try-on-preview-08-04";
 const ENDPOINT =
   `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
 
-// Google AccessToken
+// ===== Google Access Token =====
 async function getToken() {
   const auth = new GoogleAuth({
-    scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+    scopes: ["https://www.googleapis.com/auth/cloud-platform"]
   });
   const client = await auth.getClient();
   const token = await client.getAccessToken();
   return token.token || token;
 }
 
-// Virtual Try-On API
+// ===== Try-On API =====
 app.post("/tryon", async (req, res) => {
   try {
-    // --- ここで Cloud Run に届いたボディを軽くログ出力 ---
-    const { personImage, garmentImage } = req.body || {};
+    console.log("REQ_BODY received");
 
-    console.log("REQ_LEN person / garment:", 
-      personImage ? personImage.length : 0,
-      garmentImage ? garmentImage.length : 0
-    );
+    const { personImage, garmentImage } = req.body;
 
     if (!personImage || !garmentImage) {
-      console.error("Missing image(s) in request body");
       return res.status(400).json({
         status: "error",
         message: "Missing personImage or garmentImage"
       });
     }
 
-    // Virtual Try-On リクエストボディ
+    // Vertex AI Virtual Try-On payload（正式仕様）
     const body = {
       instances: [
         {
           personImage: {
             image: {
-              // ★ data: や MIME プレフィックスは付けない生の Base64
               bytesBase64Encoded: personImage
             }
           },
@@ -67,20 +60,53 @@ app.post("/tryon", async (req, res) => {
         }
       ],
       parameters: {
-        // 必須パラメータは一応入れておく
-        sampleCount: 1,
-        baseSteps: 32,
-        personGeneration: "allow_adult",
-        safetySetting: "block_medium_and_above",
-        outputOptions: {
-          mimeType: "image/png"
-        }
+        sampleCount: 1
       }
     };
 
-    console.log("SENDING_TO_VERTEX summary:", {
-      personLen: personImage.length,
-      garmentLen: garmentImage.length
+    const accessToken = await getToken();
+
+    const response = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
     });
 
-    const accessToken =
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Vertex AI Error:", data);
+      return res.status(response.status).json({
+        status: "vertex_ai_error",
+        http_code: response.status,
+        message: data.error?.message || "Unknown Vertex AI error",
+        raw: data
+      });
+    }
+
+    return res.status(200).json(data);
+
+  } catch (err) {
+    console.error("Cloud Run internal error:", err);
+    return res.status(500).json({
+      status: "error",
+      message: "Cloud Run internal error",
+      detail: err.message || String(err)
+    });
+  }
+});
+
+// ===== Health Check =====
+app.get("/", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+// ===== Server Start =====
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, () => {
+  console.log("SERVER LISTENING ON", PORT);
+});
