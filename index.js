@@ -61,7 +61,7 @@ app.post("/tryon", async (req, res) => {
     ],
     parameters: {
       sampleCount: 1,
-      "personGeneration": "allow_all_ages"
+      personGeneration: "allow_all"
     }
   };
 
