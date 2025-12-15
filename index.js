@@ -45,6 +45,9 @@ app.post("/tryon", async (req, res) => {
     const body = {
     instances: [
       {
+        // ★ ここが重要（parameters ではない）
+        personGeneration: "ALLOW_ALL_AGES",
+  
         personImage: {
           image: {
             bytesBase64Encoded: personImage
@@ -60,12 +63,7 @@ app.post("/tryon", async (req, res) => {
       }
     ],
     parameters: {
-      sampleCount: 1,
-  
-      // ★ ここが重要
-      safetySettings: {
-        personGeneration: "ALLOW_ALL_AGES"
-      }
+      sampleCount: 1
     }
   };
 
