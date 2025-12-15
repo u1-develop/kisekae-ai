@@ -43,26 +43,31 @@ app.post("/tryon", async (req, res) => {
 
     // Vertex AI Virtual Try-On payload（正式仕様）
     const body = {
-      instances: [
-        {
-          personImage: {
+    instances: [
+      {
+        personImage: {
+          image: {
+            bytesBase64Encoded: personImage
+          }
+        },
+        productImages: [
+          {
             image: {
-              bytesBase64Encoded: personImage
+              bytesBase64Encoded: garmentImage
             }
-          },
-          productImages: [
-            {
-              image: {
-                bytesBase64Encoded: garmentImage
-              }
-            }
-          ]
-        }
-      ],
-      parameters: {
-        sampleCount: 1
+          }
+        ]
       }
-    };
+    ],
+    parameters: {
+      sampleCount: 1,
+  
+      // ★ ここが重要
+      safetySettings: {
+        personGeneration: "ALLOW_ALL_AGES"
+      }
+    }
+  };
 
     const accessToken = await getToken();
 
