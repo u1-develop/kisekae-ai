@@ -1,21 +1,18 @@
-# Node.js の軽量イメージを使用
 FROM node:20-slim
 
-# アプリ用の作業ディレクトリ作成
 WORKDIR /app
 
-# package.json と package-lock.json を先にコピー
-COPY package*.json ./
+# ★ package.json を最初にコピー（必須）
+COPY package.json package-lock.json* ./
 
-# 依存パッケージをインストール
-RUN npm install --production
+# ★ キャッシュを使わず依存関係を入れる
+RUN npm install --omit=dev
 
-# アプリのソースコードをすべてコピー
+# ★ 残りのソース
 COPY . .
 
-# Cloud Run のデフォルトポートは 8080
 ENV PORT=8080
 EXPOSE 8080
 
-# アプリの起動
-CMD ["node", "index.js"]
+# ★ npm start 経由で起動（安全）
+CMD ["npm", "start"]
