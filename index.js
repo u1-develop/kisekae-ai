@@ -1,3 +1,35 @@
+// Debug build log
+console.log("VTO Gateway Build: 2025-12-03_02");
+
+import express from "express";
+import fetch from "node-fetch";
+import { GoogleAuth } from "google-auth-library";
+
+const app = express();
+
+// ===== 基本設定 =====
+app.use(express.json({ limit: "40mb" }));
+
+const PROJECT_ID = "kisekaeai";
+const LOCATION = "us-central1";
+const MODEL_ID = "virtual-try-on-preview-08-04";
+
+const ENDPOINT =
+  `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
+
+// ===== Google Access Token =====
+async function getToken() {
+  const auth = new GoogleAuth({
+    scopes: ["https://www.googleapis.com/auth/cloud-platform"]
+  });
+  const client = await auth.getClient();
+  const token = await client.getAccessToken();
+  return token.token || token;
+}
+
+// ===== Try-On API =====
+app.post("/tryon", async (req, res) => {
+  try {
     console.log("REQ_BODY received");
 
     const { personImage, garmentImage } = req.body;
